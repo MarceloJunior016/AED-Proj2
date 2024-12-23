@@ -137,9 +137,34 @@ Graph* GraphCreateTranspose(const Graph* g) {
   assert(g->isDigraph);
   assert(g->isComplete == 0);
 
-  // COMPLETE THE CODE
+  // Create a new graph with same properties
+  Graph* transpose = GraphCreate(g->numVertices, g->isDigraph, g->isWeighted);
 
-  return NULL;
+  // For each vertex in original graph
+  List* vertices = g->verticesList;
+  ListMoveToHead(vertices);
+  for (unsigned int v = 0; v < g->numVertices; ListMoveToNext(vertices), v++) {
+    struct _Vertex* vertex = ListGetCurrentItem(vertices);
+    List* edges = vertex->edgesList;
+    
+    // Skip if no edges
+    if (ListIsEmpty(edges)) continue;
+    
+    // For each edge of current vertex
+    ListMoveToHead(edges);
+    for (int e = 0; e < ListGetSize(edges); ListMoveToNext(edges), e++) {
+      struct _Edge* edge = ListGetCurrentItem(edges);
+      
+      // Add reversed edge to transpose graph
+      if (g->isWeighted) {
+        GraphAddWeightedEdge(transpose, edge->adjVertex, v, edge->weight);
+      } else {
+        GraphAddEdge(transpose, edge->adjVertex, v);
+      }
+    }
+  }
+
+  return transpose;
 }
 
 void GraphDestroy(Graph** p) {
