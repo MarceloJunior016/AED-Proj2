@@ -8,7 +8,7 @@
 
 // Student Name :
 // Student Number :
-// Student Name :
+// Student Name :z
 // Student Number :
 
 /*** COMPLETE THE GraphCreateTranspose FUNCTION ***/
@@ -133,39 +133,60 @@ Graph* GraphCreateComplete(unsigned int numVertices, int isDigraph) {
 // This function should never be called on an undirected graph
 // This function should never be called on a complete graph
 Graph* GraphCreateTranspose(const Graph* g) {
+  // Verifica se o grafo não é nulo
   assert(g != NULL);
+
+  // Verifica se o grafo é dirigido
   assert(g->isDigraph);
+
+  // Verifica se o grafo não é completo
   assert(g->isComplete == 0);
 
-  // Create a new graph with same properties
+  // Cria um novo grafo transposto com as mesmas propriedades do original
   Graph* transpose = GraphCreate(g->numVertices, g->isDigraph, g->isWeighted);
 
-  // For each vertex in original graph
-  List* vertices = g->verticesList;
-  ListMoveToHead(vertices);
-  for (unsigned int v = 0; v < g->numVertices; ListMoveToNext(vertices), v++) {
-    struct _Vertex* vertex = ListGetCurrentItem(vertices);
-    List* edges = vertex->edgesList;
-    
-    // Skip if no edges
-    if (ListIsEmpty(edges)) continue;
-    
-    // For each edge of current vertex
-    ListMoveToHead(edges);
-    for (int e = 0; e < ListGetSize(edges); ListMoveToNext(edges), e++) {
-      struct _Edge* edge = ListGetCurrentItem(edges);
-      
-      // Add reversed edge to transpose graph
+  // Obtém a lista de vértices do grafo original
+  List* listaVertices = g->verticesList;
+
+  // Move o cursor da lista de vértices para o início
+  ListMoveToHead(listaVertices);
+
+  // Percorre cada vértice do grafo original
+  for (unsigned int indiceVertice = 0; indiceVertice < g->numVertices; ListMoveToNext(listaVertices), indiceVertice++) {
+    // Obtém o vértice atual da lista
+    struct _Vertex* verticeAtual = ListGetCurrentItem(listaVertices);
+
+    // Obtém a lista de arestas (edges) do vértice atual
+    List* listaArestas = verticeAtual->edgesList;
+
+    // Verifica se o vértice atual possui arestas; se não, pula para o próximo
+    if (ListIsEmpty(listaArestas)) continue;
+
+    // Move o cursor da lista de arestas para o início
+    ListMoveToHead(listaArestas);
+
+    // Percorre cada aresta do vértice atual
+    for (int indiceAresta = 0; indiceAresta < ListGetSize(listaArestas); ListMoveToNext(listaArestas), indiceAresta++) {
+      // Obtém a aresta atual
+      struct _Edge* arestaAtual = ListGetCurrentItem(listaArestas);
+
+      // Adiciona a aresta invertida ao grafo transposto:
+      // - O vértice adjacente da aresta original passa a ser a origem
+      // - O índice do vértice atual do original passa a ser o destino
       if (g->isWeighted) {
-        GraphAddWeightedEdge(transpose, edge->adjVertex, v, edge->weight);
+        // Adiciona uma aresta com peso se o grafo original for ponderado
+        GraphAddWeightedEdge(transpose, arestaAtual->adjVertex, indiceVertice, arestaAtual->weight);
       } else {
-        GraphAddEdge(transpose, edge->adjVertex, v);
+        // Adiciona uma aresta simples se o grafo original não for ponderado
+        GraphAddEdge(transpose, arestaAtual->adjVertex, indiceVertice);
       }
     }
   }
 
+  // Retorna o grafo transposto
   return transpose;
 }
+
 
 void GraphDestroy(Graph** p) {
   assert(*p != NULL);
