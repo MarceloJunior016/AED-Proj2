@@ -34,7 +34,7 @@ struct _GraphBellmanFordAlg {
 };
 
 GraphBellmanFordAlg* GraphBellmanFordAlgExecute(Graph* g,
-                                                unsigned int startVertex) {
+ unsigned int startVertex) {
   assert(g != NULL);
   assert(startVertex < GraphGetNumVertices(g));
   assert(GraphIsWeighted(g) == 0);
