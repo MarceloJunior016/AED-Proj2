@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "Graph.h"
 #include "IntegersStack.h"
@@ -32,42 +33,120 @@ struct _GraphBellmanFordAlg {
   Graph* graph;
   unsigned int startVertex;  // The root of the shortest-paths tree
 };
-
 GraphBellmanFordAlg* GraphBellmanFordAlgExecute(Graph* g,
- unsigned int startVertex) {
+                                                unsigned int startVertex) {
+  // Verifica se o grafo não é nulo e se o vértice inicial está dentro do intervalo válido
   assert(g != NULL);
   assert(startVertex < GraphGetNumVertices(g));
-  assert(GraphIsWeighted(g) == 0);
 
+  // Aloca memória para a estrutura do algoritmo Bellman-Ford
   GraphBellmanFordAlg* result =
       (GraphBellmanFordAlg*)malloc(sizeof(struct _GraphBellmanFordAlg));
   assert(result != NULL);
 
-  // Given graph and start vertex for the shortest-paths
+  // Configuração inicial da estrutura
   result->graph = g;
   result->startVertex = startVertex;
 
+  // Obtém o número total de vértices no grafo
   unsigned int numVertices = GraphGetNumVertices(g);
 
-  //
-  // TO BE COMPLETED !!
-  //
-  // CREATE AND INITIALIZE
-  // result->marked
-  // result->distance
-  // result->predecessor
-  //
+  // Inicializa o array `marked` para identificar quais vértices foram visitados
+  result->marked = (unsigned int*)calloc(numVertices, sizeof(unsigned int));
+  assert(result->marked != NULL);
 
-  // Mark all vertices as not yet visited, i.e., ZERO
-  
-  // No vertex has (yet) a (valid) predecessor
-  
-  // No vertex has (yet) a (valid) distance to the start vertex
-  
-  // THE ALGORTIHM TO BUILD THE SHORTEST-PATHS TREE
+  // Inicializa o array `distance` para armazenar as distâncias mínimas do vértice inicial
+  result->distance = (int*)malloc(numVertices * sizeof(int));
+  assert(result->distance != NULL);
 
-  return NULL;
+  // Inicializa o array `predecessor` para armazenar os predecessores de cada vértice no caminho mínimo
+  result->predecessor = (int*)malloc(numVertices * sizeof(int));
+  assert(result->predecessor != NULL);
+
+  // Configura as distâncias iniciais como infinito e os predecessores como inexistentes (-1)
+  for (unsigned int i = 0; i < numVertices; i++) {
+    result->distance[i] = INT_MAX;  // Distância inicial infinita
+    result->predecessor[i] = -1;   // Sem predecessor inicial
+  }
+  result->distance[startVertex] = 0;  // A distância até o vértice inicial é 0
+
+  // Relaxação das arestas: executada (número de vértices - 1) vezes
+  for (unsigned int i = 1; i < numVertices; i++) {
+    for (unsigned int u = 0; u < numVertices; u++) {
+      // Obtém os vizinhos do vértice atual `u` e os pesos das arestas para eles
+      unsigned int* neighbors = GraphGetAdjacentsTo(g, u);
+      double* weights = GraphGetDistancesToAdjacents(g, u);
+
+      // Verifica se o vértice `u` tem vizinhos válidos
+      if (neighbors == NULL || weights == NULL) {
+        if (neighbors) free(neighbors); // Libera memória caso exista
+        if (weights) free(weights);     // Libera memória caso exista
+        continue;
+      }
+
+      // Relaxação das arestas adjacentes
+      unsigned int j = 0;
+      while (neighbors[j] != (unsigned int)-1 && j < numVertices) {
+        unsigned int v = neighbors[j]; // Vértice vizinho
+        if (v >= numVertices) {       // Ignora vértices inválidos
+          j++;
+          continue;
+        }
+
+        int weight = (int)weights[j]; // Peso da aresta entre `u` e `v`
+        // Verifica se a distância pode ser minimizada
+        if (result->distance[u] != INT_MAX &&
+            result->distance[u] + weight < result->distance[v]) {
+          result->distance[v] = result->distance[u] + weight; // Atualiza a menor distância
+          result->predecessor[v] = u;                        // Define `u` como predecessor de `v`
+        }
+        j++;
+      }
+      // Libera memória alocada para vizinhos e pesos
+      free(neighbors);
+      free(weights);
+    }
+  }
+
+  // Verificação de ciclos negativos
+  for (unsigned int u = 0; u < numVertices; u++) {
+    unsigned int* neighbors = GraphGetAdjacentsTo(g, u);
+    double* weights = GraphGetDistancesToAdjacents(g, u);
+
+    if (neighbors == NULL || weights == NULL) {
+      if (neighbors) free(neighbors); // Libera memória caso exista
+      if (weights) free(weights);     // Libera memória caso exista
+      continue;
+    }
+
+    unsigned int j = 0;
+    while (neighbors[j] != (unsigned int)-1 && j < numVertices) {
+      unsigned int v = neighbors[j];
+      if (v >= numVertices) {       // Ignora vértices inválidos
+        j++;
+        continue;
+      }
+
+      int weight = (int)weights[j];
+      // Verifica se ainda é possível reduzir a distância (indicando um ciclo negativo)
+      if (result->distance[u] != INT_MAX &&
+          result->distance[u] + weight < result->distance[v]) {
+        free(neighbors);
+        free(weights);
+        GraphBellmanFordAlgDestroy(&result); // Libera memória e retorna NULL
+        return NULL;
+      }
+      j++;
+    }
+    // Libera memória alocada para vizinhos e pesos
+    free(neighbors);
+    free(weights);
+  }
+
+  return result; // Retorna a estrutura contendo os resultados do algoritmo
 }
+
+
 
 void GraphBellmanFordAlgDestroy(GraphBellmanFordAlg** p) {
   assert(*p != NULL);
@@ -140,21 +219,20 @@ void GraphBellmanFordAlgDisplayDOT(const GraphBellmanFordAlg* p) {
   Graph* original_graph = p->graph;
   unsigned int num_vertices = GraphGetNumVertices(original_graph);
 
-  // The paths tree is a digraph, with no edge weights
+  // A árvore de caminhos mínimos é um digrafo sem pesos nas arestas
   Graph* paths_tree = GraphCreate(num_vertices, 1, 0);
 
-  // Use the predecessors array to add the tree edges
+  // Use o array de predecessores para adicionar as arestas da árvore
   for (unsigned int w = 0; w < num_vertices; w++) {
-    // Vertex w has a predecessor vertex v?
     int v = p->predecessor[w];
-    if (v != -1) {
+    if (v != -1 && v != (int)w) {  // Evitar self-loops
       GraphAddEdge(paths_tree, (unsigned int)v, w);
     }
   }
 
-  // Display the tree in the DOT format
+  // Exiba a árvore no formato DOT
   GraphDisplayDOT(paths_tree);
 
-  // Housekeeping
+  // Liberação de memória
   GraphDestroy(&paths_tree);
 }
