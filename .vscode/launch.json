@@ -8,10 +8,10 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/Marcelo Lino Junior/Desktop/MPI projeto 1/AED-Proj2",
-      "program": "c:/Users/Marcelo Lino Junior/Desktop/MPI projeto 1/AED-Proj2/build/Debug/outDebug",
+      "cwd": "${workspaceFolder}", // Diretório de trabalho (workspace)
+      "program": "${workspaceFolder}/build/Debug/outDebug", // Caminho para o programa
       "MIMode": "gdb",
-      "miDebuggerPath": "C:/MinGW/bin/gdb.exe",
+      "miDebuggerPath": "/usr/bin/gdb", // Caminho do GDB no Linux
       "setupCommands": [
         {
           "description": "Enable pretty-printing for gdb",
