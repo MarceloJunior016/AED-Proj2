@@ -34,134 +34,142 @@ struct _GraphBellmanFordAlg {
   Graph* graph;
   unsigned int startVertex;  // The root of the shortest-paths tree
 };
-GraphBellmanFordAlg* GraphBellmanFordAlgExecute(Graph* g, unsigned int startVertex) {
- 
-  assert(g != NULL);
-  assert(startVertex < GraphGetNumVertices(g));
-  assert(GraphIsWeighted(g) == 0);
 
 
-  // Alocação e inicialização da estrutura de dados para o algoritmo de Bellman-Ford.
-  GraphBellmanFordAlg* result = (GraphBellmanFordAlg*)malloc(sizeof(struct _GraphBellmanFordAlg));
-  assert(result != NULL);
-
-  result->graph = g;
-  result->startVertex = startVertex;
-
-  unsigned int numVertices = GraphGetNumVertices(g);
-
-  // Arrays para rastrear os vértices alcançados, as distâncias e os predecessores.
-  result->marked = (unsigned int*)calloc(numVertices, sizeof(unsigned int));
-  assert(result->marked != NULL);
-
-  result->distance = (int*)malloc(numVertices * sizeof(int));
-  assert(result->distance != NULL);
-
-  result->predecessor = (int*)malloc(numVertices * sizeof(int));
-  assert(result->predecessor != NULL);
-
-  // Inicialização: define distâncias como infinito, predecessores como -1,
-  // e todos os vértices como não alcançados.
-  for (unsigned int i = 0; i < numVertices; i++) {
-    result->distance[i] = INT_MAX; // Distância inicial infinita
-    result->predecessor[i] = -1;  // Sem predecessores no início
-    result->marked[i] = 0;        // Nenhum vértice foi alcançado ainda
-  }
-
-  // Configuração do vértice inicial
-  result->distance[startVertex] = 0; // Distância do vértice inicial para si mesmo é 0
-  result->marked[startVertex] = 1;   // Marca o vértice inicial como alcançado
-
-  // Etapa principal: Relaxação de arestas
-  // Realiza numVertices - 1 iterações para garantir que todas as distâncias sejam atualizadas.
-  for (unsigned int i = 1; i < numVertices; i++) {
-    int updated = 0; // Flag para verificar se houve atualizações
-    for (unsigned int u = 0; u < numVertices; u++) {
-      if (result->distance[u] == INT_MAX) continue; // Pula vértices não alcançáveis
-
-      // Obtém os vizinhos e os pesos das arestas do vértice atual
-      unsigned int* neighbors = GraphGetAdjacentsTo(g, u);
-      double* weights = GraphGetDistancesToAdjacents(g, u);
-
-      // Verifica se os vizinhos e pesos foram obtidos corretamente
-      if (neighbors == NULL || weights == NULL) {
-        if (neighbors) free(neighbors);
-        if (weights) free(weights);
-        continue;
-      }
-
-      unsigned int numAdjVertices = neighbors[0]; // Número de vizinhos
-      for (unsigned int j = 0; j < numAdjVertices; j++) {
-        unsigned int v = neighbors[j + 1]; // Vizinho atual
-        if (v >= numVertices) { // Verificação de segurança para índices válidos
-          printf("Erro: índice de vizinho fora dos limites em vértice %u!\n", u);
-          free(neighbors);
-          free(weights);
-          GraphBellmanFordAlgDestroy(&result);
-          return NULL;
-        }
-
-        // Relaxa a aresta se encontrar um caminho mais curto
-        int weight = (int)weights[j + 1];
-        if (result->distance[u] != INT_MAX && result->distance[u] + weight < result->distance[v]) {
-          result->distance[v] = result->distance[u] + weight;
-          result->predecessor[v] = u; // Atualiza o predecessor do vizinho
-          result->marked[v] = 1;      // Marca o vizinho como alcançado
-          updated = 1;                // Indica que houve uma atualização
-        }
-      }
-
-      // Libera a memória alocada para os vizinhos e pesos
-      free(neighbors);
-      free(weights);
+// Função para inicializar a estrutura de resultados
+// Esta função configura as distâncias iniciais de todos os vértices como "infinito" (INT_MAX),
+// define que nenhum vértice tem um predecessor no início (-1) e marca todos como não visitados.
+// Para o vértice inicial, a distância é configurada como 0 e ele é marcado como visitado.
+static void InicializarResultado(GraphBellmanFordAlg* resultado, unsigned int totalVertices, unsigned int inicio) {
+    for (unsigned int i = 0; i < totalVertices; i++) {
+        resultado->distance[i] = INT_MAX; // Considera que todos estão muito longe inicialmente
+        resultado->predecessor[i] = -1;  // Nenhum caminho foi estabelecido ainda
+        resultado->marked[i] = 0;        // Nenhum vértice foi visitado
     }
-    if (!updated) break; // Se nenhuma atualização ocorreu, encerra a iteração
-  }
-
-  // Verificação de ciclos negativos
-  // Realiza uma última iteração para verificar se existem ciclos negativos
-  for (unsigned int u = 0; u < numVertices; u++) {
-    if (result->distance[u] == INT_MAX) continue; // Pula vértices não alcançáveis
-
-    // Obtém os vizinhos e pesos novamente
-    unsigned int* neighbors = GraphGetAdjacentsTo(g, u);
-    double* weights = GraphGetDistancesToAdjacents(g, u);
-
-    if (neighbors == NULL || weights == NULL) {
-      if (neighbors) free(neighbors);
-      if (weights) free(weights);
-      continue;
-    }
-
-    unsigned int numAdjVertices = neighbors[0]; // Número de vizinhos
-    for (unsigned int j = 0; j < numAdjVertices; j++) {
-      unsigned int v = neighbors[j + 1];
-      if (v >= numVertices) {
-        printf("Erro: índice de vizinho fora dos limites em vértice %u!\n", u);
-        free(neighbors);
-        free(weights);
-        GraphBellmanFordAlgDestroy(&result);
-        return NULL;
-      }
-
-      int weight = (int)weights[j + 1];
-      if (result->distance[u] != INT_MAX && result->distance[u] + weight < result->distance[v]) {
-        // Se ainda puder relaxar uma aresta, há um ciclo negativo
-        printf("Erro: Ciclo negativo detectado em vértice %u!\n", u);
-        free(neighbors);
-        free(weights);
-        GraphBellmanFordAlgDestroy(&result);
-        return NULL;
-      }
-    }
-
-    // Libera a memória alocada
-    free(neighbors);
-    free(weights);
-  }
-
-  return result; // Retorna o resultado com as distâncias calculadas
+    resultado->distance[inicio] = 0; // O ponto de partida está a distância 0 de si mesmo
+    resultado->marked[inicio] = 1;   // Marca o vértice inicial como visitado
 }
+
+// Função para liberar recursos de memória
+// Esta função é usada para garantir que não haja desperdício de memória alocada temporariamente
+// para os vizinhos e pesos enquanto percorremos o grafo.
+static void LiberarMemoria(unsigned int* adjacentes, double* pesos) {
+    if (adjacentes) free(adjacentes);
+    if (pesos) free(pesos);
+}
+
+// Função para atualizar distâncias das arestas
+// Esta função percorre todas as arestas do grafo e tenta relaxar (atualizar) as distâncias para os vértices adjacentes.
+// Se encontrar um caminho mais curto para algum vértice, a distância é atualizada e o vértice é marcado como modificado.
+static int AtualizarDistancias(Graph* grafo, GraphBellmanFordAlg* resultado, unsigned int totalVertices) {
+    int houveAtualizacao = 0; // Indica se houve mudanças nas distâncias nesta iteração
+    for (unsigned int origem = 0; origem < totalVertices; origem++) {
+        if (resultado->distance[origem] == INT_MAX) continue; // Ignora vértices que não podem ser alcançados
+
+        unsigned int* adjacentes = GraphGetAdjacentsTo(grafo, origem); // Obtém os vértices conectados
+        double* pesos = GraphGetDistancesToAdjacents(grafo, origem);   // Obtém os pesos das conexões
+
+        if (!adjacentes || !pesos) { // Verifica se conseguiu obter as informações necessárias
+            LiberarMemoria(adjacentes, pesos);
+            continue;
+        }
+
+        unsigned int totalAdjacentes = adjacentes[0]; // O primeiro elemento indica quantos vizinhos existem
+        for (unsigned int i = 0; i < totalAdjacentes; i++) {
+            unsigned int destino = adjacentes[i + 1]; // Vértice conectado
+            int peso = (int)pesos[i + 1];            // Peso da conexão
+
+            // Verifica se encontrou um caminho mais curto para "destino"
+            if (resultado->distance[origem] + peso < resultado->distance[destino]) {
+                resultado->distance[destino] = resultado->distance[origem] + peso;
+                resultado->predecessor[destino] = origem; // Atualiza quem veio antes no caminho
+                resultado->marked[destino] = 1;           // Marca que o destino foi modificado
+                houveAtualizacao = 1;                     // Indica que houve mudanças
+            }
+        }
+
+        LiberarMemoria(adjacentes, pesos); // Libera a memória temporária usada
+    }
+    return houveAtualizacao;
+}
+
+// Função para detectar ciclos negativos
+// Esta função verifica se ainda é possível reduzir a distância de algum vértice após todas as iterações esperadas.
+// Se for possível, significa que existe um ciclo com peso negativo no grafo.
+static int DetectarCiclos(Graph* grafo, GraphBellmanFordAlg* resultado, unsigned int totalVertices) {
+    for (unsigned int origem = 0; origem < totalVertices; origem++) {
+        if (resultado->distance[origem] == INT_MAX) continue; // Ignora vértices inacessíveis
+
+        unsigned int* adjacentes = GraphGetAdjacentsTo(grafo, origem);
+        double* pesos = GraphGetDistancesToAdjacents(grafo, origem);
+
+        if (!adjacentes || !pesos) {
+            LiberarMemoria(adjacentes, pesos);
+            continue;
+        }
+
+        unsigned int totalAdjacentes = adjacentes[0];
+        for (unsigned int i = 0; i < totalAdjacentes; i++) {
+            unsigned int destino = adjacentes[i + 1];
+            int peso = (int)pesos[i + 1];
+
+            // Se ainda puder reduzir a distância, há um ciclo negativo
+            if (resultado->distance[origem] + peso < resultado->distance[destino]) {
+                printf("Erro: Ciclo negativo detectado no vértice %u!\n", origem);
+                LiberarMemoria(adjacentes, pesos);
+                return 1;
+            }
+        }
+
+        LiberarMemoria(adjacentes, pesos);
+    }
+    return 0; // Não há ciclos negativos
+}
+
+GraphBellmanFordAlg* GraphBellmanFordAlgExecute(Graph* grafo, unsigned int inicio) {
+
+    // Verificações de validade dos parâmetros
+    // Certifica-se de que o grafo e o vértice inicial são válidos antes de começar
+    assert(grafo != NULL);
+    assert(inicio < GraphGetNumVertices(grafo));
+    assert(GraphIsWeighted(grafo) == 0);
+
+    // Aloca a estrutura de resultados
+    GraphBellmanFordAlg* resultado = (GraphBellmanFordAlg*)malloc(sizeof(struct _GraphBellmanFordAlg));
+    assert(resultado != NULL);
+
+    unsigned int totalVertices = GraphGetNumVertices(grafo);
+
+    resultado->graph = grafo;
+    resultado->startVertex = inicio;
+    resultado->marked = (unsigned int*)calloc(totalVertices, sizeof(unsigned int));
+    resultado->distance = (int*)malloc(totalVertices * sizeof(int));
+    resultado->predecessor = (int*)malloc(totalVertices * sizeof(int));
+
+    assert(resultado->marked != NULL);
+    assert(resultado->distance != NULL);
+    assert(resultado->predecessor != NULL);
+
+    // Configura os valores iniciais das estruturas
+    InicializarResultado(resultado, totalVertices, inicio);
+
+    // Realiza iterações para relaxar as arestas
+    // Cada iteração tenta melhorar as estimativas de distância
+    for (unsigned int iteracao = 1; iteracao < totalVertices; iteracao++) {
+        if (!AtualizarDistancias(grafo, resultado, totalVertices)) {
+            break; // Se nenhuma atualização ocorreu, não há necessidade de continuar
+        }
+    }
+
+    // Verifica se existem ciclos negativos no grafo
+    if (DetectarCiclos(grafo, resultado, totalVertices)) {
+        GraphBellmanFordAlgDestroy(&resultado);
+        return NULL;
+    }
+
+    return resultado; // Retorna o resultado final com as distâncias calculadas
+}
+
 
 
 void GraphBellmanFordAlgDestroy(GraphBellmanFordAlg** p) {

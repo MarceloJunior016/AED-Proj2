@@ -26,45 +26,48 @@
 // Compute the transitive closure of a directed graph
 // Return the computed transitive closure as a directed graph
 // Use the Bellman-Ford algorithm
-Graph* GraphComputeTransitiveClosure(Graph* g) {
-    // Verifica se o grafo é válido (não NULL)
-    assert(g != NULL);
-    // Verifica se o grafo é orientado
-    assert(GraphIsDigraph(g));        
-    // Verifica se o grafo não possui pesos associados aos arcos
-    assert(GraphIsWeighted(g) == 0);  
+// Função para calcular o fecho transitivo de um grafo orientado
+
+// Função auxiliar para adicionar arestas de alcance
+static void AdicionarArestasDeAlcance(Graph* fecho, GraphBellmanFordAlg* algoritmo, unsigned int verticeOrigem, unsigned int totalVertices) {
+    for (unsigned int destino = 0; destino < totalVertices; destino++) {
+        // Verifica se o destino é alcançável e não cria self-loops
+        if (GraphBellmanFordAlgReached(algoritmo, destino) && verticeOrigem != destino) {
+            GraphAddEdge(fecho, verticeOrigem, destino);
+        }
+    }
+}
+
+// Função principal para calcular o fecho transitivo
+Graph* GraphComputeTransitiveClosure(Graph* grafo) {
+    // Verifica se o grafo é válido
+    assert(grafo != NULL);
+    assert(GraphIsDigraph(grafo));        // Deve ser orientado
+    assert(GraphIsWeighted(grafo) == 0); // Não pode ter pesos
 
     // Obtém o número de vértices do grafo
-    unsigned int numVertices = GraphGetNumVertices(g);
+    unsigned int totalVertices = GraphGetNumVertices(grafo);
 
-    // Cria um novo grafo orientado para representar o fecho transitivo
-    // O novo grafo terá o mesmo número de vértices e será inicializado como vazio
-    Graph* transitiveClosure = GraphCreate(numVertices, 1, 0); 
-    if (transitiveClosure == NULL) return NULL; // Retorna NULL se a criação falhar
+    // Cria um novo grafo vazio para representar o fecho transitivo
+    Graph* fechoTransitivo = GraphCreate(totalVertices, 1, 0);
+    if (fechoTransitivo == NULL) return NULL;
 
     // Para cada vértice do grafo original
-    for (unsigned int v = 0; v < numVertices; v++) {
-        // Executa o algoritmo de Bellman-Ford a partir do vértice atual `v`
-        GraphBellmanFordAlg* algorithm = GraphBellmanFordAlgExecute(g, v);
-        if (algorithm == NULL) {
-            // Se ocorrer um erro no algoritmo, libera a memória do grafo criado
-            GraphDestroy(&transitiveClosure);
+    for (unsigned int origem = 0; origem < totalVertices; origem++) {
+        // Executa o algoritmo de Bellman-Ford a partir do vértice atual
+        GraphBellmanFordAlg* algoritmoBF = GraphBellmanFordAlgExecute(grafo, origem);
+        if (algoritmoBF == NULL) {
+            GraphDestroy(&fechoTransitivo); // Libera memória em caso de erro
             return NULL;
         }
 
-        // Para cada vértice `u` do grafo
-        for (unsigned int u = 0; u < numVertices; u++) {
-            // Verifica se `u` é alcançável a partir de `v` e evita self-loops
-            if (GraphBellmanFordAlgReached(algorithm, u) && v != u) {
-                // Adiciona uma aresta de `v` para `u` no grafo de fecho transitivo
-                GraphAddEdge(transitiveClosure, v, u);
-            }
-        }
+        // Adiciona arestas ao fecho transitivo
+        AdicionarArestasDeAlcance(fechoTransitivo, algoritmoBF, origem, totalVertices);
 
         // Libera a memória alocada para o algoritmo de Bellman-Ford
-        GraphBellmanFordAlgDestroy(&algorithm);
+        GraphBellmanFordAlgDestroy(&algoritmoBF);
     }
 
-    // Retorna o grafo de fecho transitivo
-    return transitiveClosure;
+    // Retorna o grafo representando o fecho transitivo
+    return fechoTransitivo;
 }

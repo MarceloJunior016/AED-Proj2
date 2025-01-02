@@ -39,27 +39,72 @@ struct _GraphEccentricityMeasures {
 // Compute the vertex eccentricity values
 // Compute graph radius and graph diameter
 // Compute the set of central vertices
-GraphEccentricityMeasures* GraphEccentricityMeasuresCompute(Graph* g) {
-    assert(g != NULL);
+// Função para calcular medidas de excentricidade em um grafo
 
-    // Inicializa a estrutura principal
+// Função auxiliar para inicializar as medidas de raio e diâmetro do grafo
+static void InicializarRaioDiametro(GraphEccentricityMeasures* medidas) {
+    medidas->graphRadius = INT_MAX; // Configura o raio inicial como infinito
+    medidas->graphDiameter = 0;    // Configura o diâmetro inicial como zero
+}
+
+// Função auxiliar para calcular a maior distância de um vértice a outros
+static int CalcularMaiorDistancia(GraphAllPairsShortestDistances* apsd, unsigned int vertice, unsigned int numVertices) {
+    int maiorDistancia = -1; // Variável para armazenar a maior distância
+    for (unsigned int w = 0; w < numVertices; w++) {
+        int distancia = GraphGetDistanceVW(apsd, vertice, w);
+        if (distancia != -1 && distancia > maiorDistancia) {
+            maiorDistancia = distancia; // Atualiza a maior distância encontrada
+        }
+    }
+    return maiorDistancia;
+}
+
+// Função auxiliar para determinar os vértices centrais
+static unsigned int* DeterminarVerticesCentrais(GraphEccentricityMeasures* medidas, unsigned int numVertices) {
+    unsigned int numCentrais = 0;
+    for (unsigned int v = 0; v < numVertices; v++) {
+        if (medidas->eccentricity[v] == medidas->graphRadius) {
+            numCentrais++;
+        }
+    }
+
+    unsigned int* centrais = (unsigned int*)malloc((numCentrais + 1) * sizeof(unsigned int));
+    if (centrais == NULL) return NULL;
+
+    centrais[0] = numCentrais; // O primeiro elemento armazena o número de vértices centrais
+    unsigned int indice = 1;
+    for (unsigned int v = 0; v < numVertices; v++) {
+        if (medidas->eccentricity[v] == medidas->graphRadius) {
+            centrais[indice++] = v;
+        }
+    }
+
+    return centrais;
+}
+
+// Função principal para calcular medidas de excentricidade em um grafo
+GraphEccentricityMeasures* GraphEccentricityMeasuresCompute(Graph* grafo) {
+    // Verifica se o grafo é válido
+    assert(grafo != NULL);
+
+    // Aloca a estrutura que armazenará os resultados
     GraphEccentricityMeasures* medidas = 
         (GraphEccentricityMeasures*)malloc(sizeof(GraphEccentricityMeasures));
     if (medidas == NULL) return NULL;
 
-    medidas->graph = g;
+    medidas->graph = grafo;
 
     // Obtém o número de vértices do grafo
-    unsigned int numVertices = GraphGetNumVertices(g);
+    unsigned int numVertices = GraphGetNumVertices(grafo);
 
-    // Calcula as distâncias entre todos os pares de vértices usando o módulo ALL-PAIRS-SHORTEST-DISTANCES
-    GraphAllPairsShortestDistances* apsd = GraphAllPairsShortestDistancesExecute(g);
+    // Calcula as menores distâncias entre todos os pares de vértices
+    GraphAllPairsShortestDistances* apsd = GraphAllPairsShortestDistancesExecute(grafo);
     if (apsd == NULL) {
         free(medidas);
         return NULL;
     }
 
-    // Aloca memória para a excentricidade de cada vértice
+    // Aloca memória para armazenar a excentricidade de cada vértice
     medidas->eccentricity = (int*)malloc(numVertices * sizeof(int));
     if (medidas->eccentricity == NULL) {
         GraphAllPairsShortestDistancesDestroy(&apsd);
@@ -68,43 +113,25 @@ GraphEccentricityMeasures* GraphEccentricityMeasuresCompute(Graph* g) {
     }
 
     // Inicializa o raio e o diâmetro do grafo
-    medidas->graphRadius = INT_MAX;
-    medidas->graphDiameter = 0;
+    InicializarRaioDiametro(medidas);
 
-    // Calcula a excentricidade de cada vértice
+    // Calcula a excentricidade de cada vértice e atualiza raio e diâmetro
     for (unsigned int v = 0; v < numVertices; v++) {
-        int maxDistance = -1;
-        for (unsigned int w = 0; w < numVertices; w++) {
-            int distance = GraphGetDistanceVW(apsd, v, w);
-            if (distance != -1) {  // Ignora vértices não alcançáveis
-                if (distance > maxDistance) {
-                    maxDistance = distance;
-                }
-            }
-        }
-        medidas->eccentricity[v] = maxDistance;
+        int maiorDistancia = CalcularMaiorDistancia(apsd, v, numVertices);
+        medidas->eccentricity[v] = maiorDistancia;
 
-        // Atualiza o raio e o diâmetro do grafo
-        if (maxDistance != -1) {  // Ignora vértices isolados
-            if (maxDistance < medidas->graphRadius) {
-                medidas->graphRadius = maxDistance;
+        if (maiorDistancia != -1) { // Ignora vértices inacessíveis
+            if (maiorDistancia < medidas->graphRadius) {
+                medidas->graphRadius = maiorDistancia;
             }
-            if (maxDistance > medidas->graphDiameter) {
-                medidas->graphDiameter = maxDistance;
+            if (maiorDistancia > medidas->graphDiameter) {
+                medidas->graphDiameter = maiorDistancia;
             }
         }
     }
 
-    // Determina o conjunto de vértices centrais (aqueles com excentricidade igual ao raio)
-    unsigned int numCentralVertices = 0;
-    for (unsigned int v = 0; v < numVertices; v++) {
-        if (medidas->eccentricity[v] == medidas->graphRadius) {
-            numCentralVertices++;
-        }
-    }
-
-    // Aloca memória para os vértices centrais
-    medidas->centralVertices = (unsigned int*)malloc((numCentralVertices + 1) * sizeof(unsigned int));
+    // Determina os vértices centrais
+    medidas->centralVertices = DeterminarVerticesCentrais(medidas, numVertices);
     if (medidas->centralVertices == NULL) {
         GraphAllPairsShortestDistancesDestroy(&apsd);
         free(medidas->eccentricity);
@@ -112,19 +139,12 @@ GraphEccentricityMeasures* GraphEccentricityMeasuresCompute(Graph* g) {
         return NULL;
     }
 
-    medidas->centralVertices[0] = numCentralVertices; // O primeiro elemento armazena o número de vértices centrais
-    unsigned int index = 1;
-    for (unsigned int v = 0; v < numVertices; v++) {
-        if (medidas->eccentricity[v] == medidas->graphRadius) {
-            medidas->centralVertices[index++] = v;
-        }
-    }
-
-    // Libera a estrutura APSD
+    // Libera os recursos da estrutura APSD
     GraphAllPairsShortestDistancesDestroy(&apsd);
 
-    return medidas;
+    return medidas; // Retorna as medidas calculadas
 }
+
 
 unsigned int* GraphGetCentralVertices(const GraphEccentricityMeasures* p) {
     assert(p != NULL);
